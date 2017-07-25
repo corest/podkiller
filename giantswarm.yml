@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: giantswarmdemo
+  namespace: kube-system
+spec:
+  containers:
+  - name: giantswarmdemo
+    image: corest/giantswarmdemo
