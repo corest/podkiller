@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"fmt"
 	"net/http"
 	"strconv"
 )
@@ -24,8 +25,8 @@ func writeJSONResponse(w http.ResponseWriter, status int, data []byte) {
 	w.Write(data)
 }
 
-func healthHandler() {
+func healthHandler(config *Config) {
 	h := http.NewServeMux()
 	h.HandleFunc("/health", health)
-	go http.ListenAndServe(":9090", h)
+	go http.ListenAndServe(fmt.Sprintf(":%s", strconv.Itoa(config.general.port)), h)
 }

@@ -23,10 +23,9 @@ func main() {
 		panic(err.Error())
 	}
 
-	log.Printf(config.Title)
 	// clientSet := clientSet()
 
-	healthHandler()
+	healthHandler(&config)
 
 	if err := Run(); err != nil {
 		panic(err.Error())

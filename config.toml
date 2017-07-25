@@ -1,0 +1,30 @@
+[general]
+port = 8080
+
+[scheduler]
+timezone = "Europe/Kiev"
+# Scheduler running interval, in cron format (e.g. every minute: '*****')
+# Leave -1 for random next run time
+running_interval = -1
+# Allow to run leon only between this hours/days.  
+allowed_period = ["00.00 Mon", "23.59 Sun"]
+
+[killer]
+etcd_killer_key = "pod-killer"
+# Only pods with this label will be killed
+match_label = "doomed"
+#If this is true - match_label will be ignored and all pods 
+# with respectin go while/black lists may be killed
+match_all = false
+# If allow - all nodes except blacklist can be killed, ignore whitelist
+# If deny - only pods in whitelist can be killed, ignore blacklist
+default_policy = "deny" # default value will be deny
+namespace_whitelist = ["default"]
+namespace_blacklist = ["kube-system"]
+# in seconds
+retry_interval = 60
+
+
+
+
+
