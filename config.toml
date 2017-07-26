@@ -1,16 +1,27 @@
+title = "TOML Example"
+
 [general]
 port = 8080
 
 [scheduler]
 timezone = "Europe/Kiev"
-# Scheduler running interval, in cron format (e.g. every minute: '*****')
-# Leave -1 for random next run time
-running_interval = -1
-# Allow to run leon only between this hours/days.  
-allowed_period = ["00.00 Mon", "23.59 Sun"]
+# Scheduler running interval, in cron format (with seconds)
+# Examples: 
+#   "* * * * * *" - Every second
+#   "0 * * * * *" - Every minute
+#   "0 30 * * * *"  - Every hour on the half hour
+#   "@hourly" - Every hour
+#   "@every 1h30m" - Every hour thirty
+#   "0 */2 * * mon-fri" - Every two hours from Monday to Friday
+#
+#   "random" for random next run time
+crontime = "0 * * * * *"
+# random_range_measure used if running interval = "random"
+# it specifies measues, which will be used for generating random schedule interval between 1..59
+# minutes -> "*/minutes * * * *" , hours -> "* */hours * * *"
+random_range_measure = "minutes"
 
 [killer]
-etcd_killer_key = "pod-killer"
 # Only pods with this label will be killed
 match_label = "doomed"
 #If this is true - match_label will be ignored and all pods 

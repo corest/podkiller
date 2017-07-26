@@ -2,16 +2,17 @@ package main
 
 import (
 	"log"
-	"time"
+	"runtime"
 )
 
-func Run() error {
-
-	for {
-		// Calculate duration to sleep before next run
-		log.Printf("Print ---")
-		time.Sleep(3 * time.Second)
+func Run(config *killerConfig) error {
+    job := killerJob{
+		clientset: clientSet(),
+		cronstring: config.Scheduler.Crontime,
 	}
+	scheduler := getJobScheduler(config, &job)
+    scheduler.Start()
+	return nil
 }
 
 func main() {
@@ -23,11 +24,11 @@ func main() {
 		panic(err.Error())
 	}
 
-	// clientSet := clientSet()
-
 	healthHandler(&config)
 
-	if err := Run(); err != nil {
+	if err := Run(&config); err != nil {
 		panic(err.Error())
 	}
+
+	runtime.Goexit()
 }

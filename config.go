@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"strconv"
 	"fmt"
 
 	"github.com/BurntSushi/toml"
@@ -13,37 +12,37 @@ const (
 )
 
 // Configuration structure
-type Config struct {
-	general generalConfig
-	scheduler schedulerConfig
+type killerConfig struct {
+	General generalConfig
+	Scheduler schedulerConfig
 }
 
 type generalConfig struct {
-	port int
+	Port int
 }
 
 type schedulerConfig struct {
-	timezone string
-    running_interval int
-    allowed_period [2]string
+	Timezone string
+    Crontime string `toml:"crontime"`
+    Random_range_measure string
 }
 
-func initDefault() *Config {
+func initDefault() *killerConfig {
 	log.Printf("Load default values...")
-	config := &Config{
-		general: generalConfig{
-			port: 8081,
+	config := &killerConfig{
+		General: generalConfig{
+			Port: 8081,
 		},
-		scheduler: schedulerConfig {
-			timezone: "Europe/Kiev",
-			running_interval: -1,
-			allowed_period: [2]string{"00.00 Mon", "23.59 Sun"},
+		Scheduler: schedulerConfig {
+			Timezone: "Europe/Kiev",
+			Crontime: "0 0 * * * *", 
+			Random_range_measure: "minutes",
 		},
 	}
 	return config
 }
 
-func getConfig() (Config, error) {
+func getConfig() (killerConfig, error) {
 	log.Printf("Initialize config...")
 
     config := initDefault()

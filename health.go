@@ -25,8 +25,8 @@ func writeJSONResponse(w http.ResponseWriter, status int, data []byte) {
 	w.Write(data)
 }
 
-func healthHandler(config *Config) {
+func healthHandler(config *killerConfig) {
 	h := http.NewServeMux()
 	h.HandleFunc("/health", health)
-	go http.ListenAndServe(fmt.Sprintf(":%s", strconv.Itoa(config.general.port)), h)
+	go http.ListenAndServe(fmt.Sprintf(":%s", strconv.Itoa(config.General.Port)), h)
 }
