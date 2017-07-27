@@ -6,12 +6,16 @@ import (
 )
 
 func Run(config *killerConfig) error {
-    job := killerJob{
-		clientset: clientSet(),
-		cronstring: config.Scheduler.Crontime,
+	job := &killerJob{
+		clientset:    clientSet(),
+		killerConfig: &config.Killer,
 	}
-	scheduler := getJobScheduler(config, &job)
-    scheduler.Start()
+	scheduler, err := getJobScheduler(config, job)
+	if err != nil {
+		log.Fatalf("Unable to schedule pod-killer", err)
+	}
+
+	scheduler.Start()
 	return nil
 }
 

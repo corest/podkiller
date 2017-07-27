@@ -1,8 +1,9 @@
 package main
 
 import (
-	"log"
 	"fmt"
+	"log"
+	"time"
 
 	"github.com/BurntSushi/toml"
 )
@@ -13,8 +14,9 @@ const (
 
 // Configuration structure
 type killerConfig struct {
-	General generalConfig
+	General   generalConfig
 	Scheduler schedulerConfig
+	Killer    runnerConfig
 }
 
 type generalConfig struct {
@@ -22,22 +24,28 @@ type generalConfig struct {
 }
 
 type schedulerConfig struct {
-	Timezone string
-    Crontime string `toml:"crontime"`
-    Random_range_measure string
+	Timezone             string
+	Crontime             string `toml:"crontime"`
+	Random_range_measure string
+}
+
+type runnerConfig struct {
+	Timeslot_deny_policy bool
+	Schedule_timeslots   [][2]time.Time
 }
 
 func initDefault() *killerConfig {
 	log.Printf("Load default values...")
+	const layout = "2017-07-27 15:00:46"
 	config := &killerConfig{
 		General: generalConfig{
 			Port: 8081,
 		},
-		Scheduler: schedulerConfig {
+		Scheduler: schedulerConfig{
 			Timezone: "Europe/Kiev",
-			Crontime: "0 0 * * * *", 
-			Random_range_measure: "minutes",
+			Crontime: "0 s p * * *",
 		},
+		Killer: runnerConfig{},
 	}
 	return config
 }
@@ -45,14 +53,13 @@ func initDefault() *killerConfig {
 func getConfig() (killerConfig, error) {
 	log.Printf("Initialize config...")
 
-    config := initDefault()
+	config := initDefault()
 
 	if _, err := toml.DecodeFile(cfgpath, config); err != nil {
 		log.Fatal(fmt.Sprintf("Unable to load config %s\n", cfgpath), err.Error())
-	} 
-	
+	}
+
 	log.Printf(fmt.Sprintf("Pod-killer uses config from %s\n", cfgpath))
-	
 
 	//if err := viper.ReadInConfig(); err != nil {
 	//	return err

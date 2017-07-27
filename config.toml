@@ -7,8 +7,8 @@ port = 8080
 timezone = "Europe/Kiev"
 # Scheduler running interval, in cron format (with seconds)
 # Examples: 
-#   "* * * * * *" - Every second
-#   "0 * * * * *" - Every minute
+#   "p * * * * *" - With random period at seconds (p - period)
+#   "0 s * * * *" - At random minute every hour (s strict)
 #   "0 30 * * * *"  - Every hour on the half hour
 #   "@hourly" - Every hour
 #   "@every 1h30m" - Every hour thirty
@@ -16,10 +16,6 @@ timezone = "Europe/Kiev"
 #
 #   "random" for random next run time
 crontime = "0 * * * * *"
-# random_range_measure used if running interval = "random"
-# it specifies measues, which will be used for generating random schedule interval between 1..59
-# minutes -> "*/minutes * * * *" , hours -> "* */hours * * *"
-random_range_measure = "minutes"
 
 [killer]
 # Only pods with this label will be killed
@@ -29,7 +25,7 @@ match_label = "doomed"
 match_all = false
 # If allow - all nodes except blacklist can be killed, ignore whitelist
 # If deny - only pods in whitelist can be killed, ignore blacklist
-default_policy = "deny" # default value will be deny
+default_killer_policy = "deny" # default value will be deny
 namespace_whitelist = ["default"]
 namespace_blacklist = ["kube-system"]
 # in seconds

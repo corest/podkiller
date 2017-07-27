@@ -1,80 +1,84 @@
 package main
 
 import (
-    "math/rand"
-    "time"
-	"log"
+	"bytes"
 	"fmt"
+	"log"
+	"math/rand"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/robfig/cron"
 )
 
 func random(min, max int) int {
-    rand.Seed(time.Now().Unix())
-    return rand.Intn(max - min) + min
+	if min == 0 {
+		min = 1
+	}
+	rand.Seed(time.Now().UnixNano())
+	return rand.Intn(max-min) + min
 }
 
-func generateCron(measure string) string {
-	cronstring := "*/%d * * * *"
-	var rand int
-	switch measure {
-	case "seconds":
-	    rand = random(0,59)
-        cronstring = "*/%d * * * * *"
-	case "minutes":
-	    rand = random(0,59)
-        cronstring = "*/%d * * * *"
-	case "hours":
-	    rand = random(0,23)
-        cronstring = "* * */%d * * *"
-	case "days":
-	    rand = random(1,31)
-        cronstring = "* * * */%d * *"
-	case "months":
-	    rand = random(1,12)
-        cronstring = "* * * * */%d *"
-	case "weekdays":
-	    rand = random(0,6)
-        cronstring = "* * * * * */%d"
+func parseCronOption(c string, min, max int) string {
+	var res string
+	rand := strconv.Itoa(random(min, max))
+	switch c {
+	case "s":
+		res = rand
+	case "p":
+		res = fmt.Sprintf("*/%s", rand)
 	default:
-	    log.Printf("Unsupported value found for time measure found in config")
-	}    
-	return fmt.Sprintf(cronstring, rand)
-}
-
-func getSchedule(config *killerConfig) *cron.Schedule {
-
-	crontime := config.Scheduler.Crontime
-
-    if crontime == "random" {
-	   log.Printf("Using random generated schedule")
-       random_range_measure := config.Scheduler.Random_range_measure
-	   crontime = generateCron(random_range_measure)
-	} 
-	
-    log.Printf("Used cronstring: %s", crontime)
-
-    schedule, err := cron.Parse(crontime)
-	if err != nil {
-		log.Fatal(err)
+		res = c
 	}
 
-    return &schedule
+	return res
 }
 
-func getJobScheduler(config *killerConfig, cmd *killerJob)  *cron.Cron {
+func getCronTime(config *killerConfig) string {
 
-    var cronjob *cron.Cron
-    timezone := config.Scheduler.Timezone
-	schedule := getSchedule(config)
+	cronTemplate := config.Scheduler.Crontime
+	var buffer bytes.Buffer
+	cronLimits := [6][2]int{{0, 59}, {0, 59}, {0, 23}, {1, 31}, {1, 12}, {0, 6}}
+
+	for i, c := range strings.Split(cronTemplate, " ") {
+
+		if i != 0 {
+			buffer.WriteString(" ")
+		}
+		buffer.WriteString(parseCronOption(c, cronLimits[i][0], cronLimits[i][1]))
+
+	}
+
+	crontime := buffer.String()
+	log.Printf("Using cronstring: %s", crontime)
+
+	return crontime
+}
+
+func getJobScheduler(config *killerConfig, cmd *killerJob) (*cron.Cron, error) {
+
+	var cronjob *cron.Cron
+	timezone := config.Scheduler.Timezone
 	loc, err := time.LoadLocation(timezone)
 	if err != nil {
 		log.Printf("Failed to parse timezone. Using localtime")
 		cronjob = cron.New()
 	} else {
-        cronjob = cron.NewWithLocation(loc)
+		cronjob = cron.NewWithLocation(loc)
 	}
 
-    cronjob.Schedule(*schedule, cmd)
+	crontime := getCronTime(config)
+	schedule, err := cron.Parse(crontime)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	return cronjob
+	nextrun := schedule.Next(time.Now())
+	log.Printf("Next pod-killer run at: %s", nextrun.String())
+
+	cmd.setSchedule(crontime)
+	cronjob.Schedule(schedule, cmd)
+
+	return cronjob, nil
 }
