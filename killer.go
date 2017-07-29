@@ -2,9 +2,11 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/robfig/cron"
@@ -36,12 +38,80 @@ type killerJob struct {
 	cronstring   string
 }
 
+type eventReceivers struct {
+	pods []*doomedPod
+}
+
+func (cemetry *eventReceivers) layPodLow(pod *doomedPod) error {
+	cemetry.pods = append(cemetry.pods, pod)
+	return nil
+}
+
+type doomedPod struct {
+	name    string
+	isAlive bool
+}
+
 func (job *killerJob) setSchedule(crontstring string) {
 	job.cronstring = crontstring
 }
 
+func (job *killerJob) executeDoomedPod(pods chan *doomedPod, necrolog *chan *doomedPod, wg *sync.WaitGroup) error {
+	defer wg.Done()
+	var pod *doomedPod
+	select {
+	case pod = <-pods:
+		pod.isAlive = false
+		log.Printf("Executing pod '%s'", pod.name)
+	default:
+		fmt.Println("No pods were executed")
+	}
+
+	select {
+	case *necrolog <- pod:
+		log.Printf("Mark pod '%s' as dead ", pod.name)
+	default:
+		fmt.Println("No pods were marked as dead")
+	}
+
+	return nil
+}
+
 func (job killerJob) Run() {
 
+	var wg sync.WaitGroup
+
+	// get somewhere dooomed pods by puutting into channel and return channel https://blog.golang.org/pipelines
+	testPod1 := &doomedPod{
+		name:    "Testpod1",
+		isAlive: true,
+	}
+	testPod2 := &doomedPod{
+		name:    "Testpod2",
+		isAlive: true,
+	}
+
+	num := 2
+
+	wg.Add(num)
+	condemnedPods := make(chan *doomedPod, num)
+	necrology := make(chan *doomedPod, num) // buffered channel because unbeffered wait for read
+
+	condemnedPods <- testPod1
+	condemnedPods <- testPod2
+
+	for i := 0; i < num; i++ {
+		go job.executeDoomedPod(condemnedPods, &necrology, &wg)
+	}
+
+	go func() {
+		for pod := range necrology {
+			// use this for sending events
+			log.Printf("Pod '%s' is alive %t", pod.name, pod.isAlive)
+		}
+	}()
+
+	wg.Wait()
 	/* 	clientset := job.clientset
 
 	pods, err := clientset.CoreV1().Pods("").List(metav1.ListOptions{})
@@ -65,7 +135,7 @@ func (job killerJob) Run() {
 	} */
 	schedule, _ := cron.Parse(job.cronstring)
 	nextrun := schedule.Next(time.Now())
-	log.Printf("Next pod-killer run at: %s", nextrun.String())
+	log.Printf("The Moor has done his work, the Moor can go. Next run at: %s", nextrun.String())
 }
 
 func clientSet() *kubernetes.Clientset {
