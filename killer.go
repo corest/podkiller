@@ -85,52 +85,58 @@ func (job *killerJob) executeDoomedPods(namespace string, wg *sync.WaitGroup) er
 	if err != nil {
 		log.Printf("Failed to get pods from namespace '%s'. %v ", namespace, err)
 	}
-	podsNumber := len(pods.Items)
 
-	condemnedPodsChannel := make(chan *doomedPod, podsNumber)
-	for _, pod := range pods.Items {
-		dpod := &doomedPod{
-			name:      pod.Name,
-			namespace: namespace,
-			isAlive:   true,
+	if len(pods.Items) > 0 {
+		podsNumber := len(pods.Items)
+		log.Printf("Found %d pods to kill in namespace '%s'.", podsNumber, namespace)
+
+		condemnedPodsChannel := make(chan *doomedPod, podsNumber)
+		for _, pod := range pods.Items {
+			dpod := &doomedPod{
+				name:      pod.Name,
+				namespace: namespace,
+				isAlive:   true,
+			}
+			condemnedPodsChannel <- dpod
 		}
-		condemnedPodsChannel <- dpod
-	}
 
-	necrology := make(chan *doomedPod, podsNumber)
-	var podsWG sync.WaitGroup
-	podsWG.Add(podsNumber)
-	for i := 0; i < len(pods.Items); i++ {
-		go func() {
-			defer podsWG.Done()
-			var pod *doomedPod
-			select {
-			case pod = <-condemnedPodsChannel:
-				pod.isAlive = false
-				log.Printf("Executing pod '%s'", pod.name)
-				err := job.clientset.Core().Pods(pod.namespace).Delete(pod.name, nil)
-				if err != nil {
-					log.Printf("Unable to delete pod %s because %v", pod.name, err)
+		necrology := make(chan *doomedPod, podsNumber)
+		var podsWG sync.WaitGroup
+		podsWG.Add(podsNumber)
+		for i := 0; i < len(pods.Items); i++ {
+			go func() {
+				defer podsWG.Done()
+				var pod *doomedPod
+				select {
+				case pod = <-condemnedPodsChannel:
+					pod.isAlive = false
+					log.Printf("Executing pod '%s'(namespace: '%s')", pod.name, pod.namespace)
+					err := job.clientset.Core().Pods(pod.namespace).Delete(pod.name, nil)
+					if err != nil {
+						log.Printf("Unable to delete pod %s(namespace: '%s') because %v", pod.name, pod.namespace, err)
+					}
+				default:
+					fmt.Println("No pods were executed")
 				}
-			default:
-				fmt.Println("No pods were executed")
-			}
 
-			select {
-			case necrology <- pod:
-				log.Printf("Mark pod '%s' as dead ", pod.name)
-			default:
-				fmt.Println("No pods were marked as dead")
-			}
-		}()
+				select {
+				case necrology <- pod:
+					log.Printf("Mark pod '%s'(namespace: '%s') as dead ", pod.name, pod.namespace)
+				default:
+					fmt.Println("No pods were marked as dead")
+				}
+			}()
+		}
+
+		podsWG.Wait()
 	}
-
-	podsWG.Wait()
 
 	return nil
 }
 
 func (job killerJob) Run() {
+
+	log.Println("Running new killer job...")
 
 	var namespaceWg sync.WaitGroup
 
@@ -146,7 +152,7 @@ func (job killerJob) Run() {
 
 	schedule, _ := cron.Parse(job.cronstring)
 	nextrun := schedule.Next(time.Now())
-	log.Printf("The Moor has done his work, the Moor can go. Next run at: %s", nextrun.String())
+	log.Printf("...done. Next run at: %s", nextrun.String())
 }
 
 func clientSet() *kubernetes.Clientset {
@@ -178,9 +184,4 @@ func homeDir() string {
 		return h
 	}
 	return os.Getenv("USERPROFILE") // windows
-}
-
-func killPod(clientset *kubernetes.Clientset, namespace string, pod string, reason string) {
-	log.Printf("Killing pod %s because %s\n", pod, reason)
-
 }

@@ -1,10 +1,11 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: nginx
+  name: caddy
+  namespace: staging
 spec:
   containers:
-  - name: nginx
-    image: nginx:1.7.9
+  - name: caddy
+    image: abiosoft/caddy:0.10.4
     ports:
     - containerPort: 80
