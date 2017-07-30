@@ -6,9 +6,11 @@ import (
 )
 
 func Run(config *killerConfig) error {
+	listOptions := getKubernetesListOptions(config)
 	job := &killerJob{
 		clientset:    clientSet(),
 		killerConfig: &config.Killer,
+		listOptions:  listOptions,
 	}
 	scheduler, err := getJobScheduler(config, job)
 	if err != nil {

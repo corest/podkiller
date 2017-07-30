@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/BurntSushi/toml"
 )
@@ -30,8 +29,10 @@ type schedulerConfig struct {
 }
 
 type runnerConfig struct {
-	Timeslot_deny_policy bool
-	Schedule_timeslots   [][2]time.Time
+	Selector              string
+	Match_all             bool
+	Namespace_deny_policy bool
+	Namespace_list        []string
 }
 
 func initDefault() *killerConfig {
@@ -45,7 +46,12 @@ func initDefault() *killerConfig {
 			Timezone: "Europe/Kiev",
 			Crontime: "0 s p * * *",
 		},
-		Killer: runnerConfig{},
+		Killer: runnerConfig{
+			Selector:              "destiny in (doomed)",
+			Match_all:             false,
+			Namespace_deny_policy: true,
+			Namespace_list:        []string{"kube-system"},
+		},
 	}
 	return config
 }

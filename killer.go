@@ -13,6 +13,7 @@ import (
 
 	/*	"k8s.io/client-go/kubernetes"
 		"k8s.io/client-go/rest"*/
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -35,6 +36,7 @@ import (
 type killerJob struct {
 	clientset    *kubernetes.Clientset
 	killerConfig *runnerConfig
+	listOptions  *metav1.ListOptions
 	cronstring   string
 }
 
@@ -48,12 +50,32 @@ func (cemetry *eventReceivers) layPodLow(pod *doomedPod) error {
 }
 
 type doomedPod struct {
-	name    string
-	isAlive bool
+	name      string
+	namespace string
+	isAlive   bool
 }
 
 func (job *killerJob) setSchedule(crontstring string) {
 	job.cronstring = crontstring
+}
+
+func (job *killerJob) extractDoomedPods(namespaces []string) ([]*doomedPod, error) {
+	var condemnedPods []*doomedPod
+	for _, namespace := range namespaces {
+		pods, err := job.clientset.CoreV1().Pods(namespace).List(*job.listOptions)
+		if err != nil {
+			log.Printf("Failed to get pods from namespace '%s'. %v ", namespace, err)
+		}
+		for _, pod := range pods.Items {
+			dpod := &doomedPod{
+				name:      pod.Name,
+				namespace: namespace,
+				isAlive:   true,
+			}
+			condemnedPods = append(condemnedPods, dpod)
+		}
+	}
+	return condemnedPods, nil
 }
 
 func (job *killerJob) executeDoomedPod(pods chan *doomedPod, necrolog *chan *doomedPod, wg *sync.WaitGroup) error {
@@ -81,27 +103,25 @@ func (job killerJob) Run() {
 
 	var wg sync.WaitGroup
 
-	// get somewhere dooomed pods by puutting into channel and return channel https://blog.golang.org/pipelines
-	testPod1 := &doomedPod{
-		name:    "Testpod1",
-		isAlive: true,
-	}
-	testPod2 := &doomedPod{
-		name:    "Testpod2",
-		isAlive: true,
+	namespaces := getKubernetesNamespaces(job.killerConfig, job.clientset)
+	condemnedPods, err := job.extractDoomedPods(namespaces)
+	if err != nil {
+		log.Fatalf("Failed to get list of condemned pods %v", err)
 	}
 
-	num := 2
+	podsNumber := len(condemnedPods)
 
-	wg.Add(num)
-	condemnedPods := make(chan *doomedPod, num)
-	necrology := make(chan *doomedPod, num) // buffered channel because unbeffered wait for read
+	wg.Add(podsNumber)
 
-	condemnedPods <- testPod1
-	condemnedPods <- testPod2
+	condemnedPodsChannel := make(chan *doomedPod, podsNumber)
+	for _, pod := range condemnedPods {
+		condemnedPodsChannel <- pod
+	}
 
-	for i := 0; i < num; i++ {
-		go job.executeDoomedPod(condemnedPods, &necrology, &wg)
+	necrology := make(chan *doomedPod, podsNumber) // buffered channel because unbeffered wait for read
+
+	for i := 0; i < podsNumber; i++ {
+		go job.executeDoomedPod(condemnedPodsChannel, &necrology, &wg)
 	}
 
 	go func() {
@@ -112,7 +132,9 @@ func (job killerJob) Run() {
 	}()
 
 	wg.Wait()
+
 	/* 	clientset := job.clientset
+
 
 	pods, err := clientset.CoreV1().Pods("").List(metav1.ListOptions{})
 	if err != nil {
