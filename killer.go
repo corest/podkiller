@@ -14,7 +14,6 @@ import (
 	/*	"k8s.io/client-go/kubernetes"
 		"k8s.io/client-go/rest"*/
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -34,17 +33,19 @@ import (
 }*/
 
 type killerJob struct {
-	clientset    *kubernetes.Clientset
-	killerConfig *runnerConfig
-	listOptions  *metav1.ListOptions
-	cronstring   string
+	clientset         *kubernetes.Clientset
+	killerConfig      *runnerConfig
+	listOptions       *metav1.ListOptions
+	allowedNamespaces []string
+	cronstring        string
 }
 
-type eventReceivers struct {
-	pods []*doomedPod
+type namespaceNecrology struct {
+	namespace string
+	pods      []*doomedPod
 }
 
-func (cemetry *eventReceivers) layPodLow(pod *doomedPod) error {
+func (cemetry *namespaceNecrology) layPodLow(pod *doomedPod) error {
 	cemetry.pods = append(cemetry.pods, pod)
 	return nil
 }
@@ -78,83 +79,71 @@ func (job *killerJob) extractDoomedPods(namespaces []string) ([]*doomedPod, erro
 	return condemnedPods, nil
 }
 
-func (job *killerJob) executeDoomedPod(pods chan *doomedPod, necrolog *chan *doomedPod, wg *sync.WaitGroup) error {
+func (job *killerJob) executeDoomedPods(namespace string, wg *sync.WaitGroup) error {
 	defer wg.Done()
-	var pod *doomedPod
-	select {
-	case pod = <-pods:
-		pod.isAlive = false
-		log.Printf("Executing pod '%s'", pod.name)
-	default:
-		fmt.Println("No pods were executed")
+	pods, err := job.clientset.CoreV1().Pods(namespace).List(*job.listOptions)
+	if err != nil {
+		log.Printf("Failed to get pods from namespace '%s'. %v ", namespace, err)
+	}
+	podsNumber := len(pods.Items)
+
+	condemnedPodsChannel := make(chan *doomedPod, podsNumber)
+	for _, pod := range pods.Items {
+		dpod := &doomedPod{
+			name:      pod.Name,
+			namespace: namespace,
+			isAlive:   true,
+		}
+		condemnedPodsChannel <- dpod
 	}
 
-	select {
-	case *necrolog <- pod:
-		log.Printf("Mark pod '%s' as dead ", pod.name)
-	default:
-		fmt.Println("No pods were marked as dead")
+	necrology := make(chan *doomedPod, podsNumber)
+	var podsWG sync.WaitGroup
+	podsWG.Add(podsNumber)
+	for i := 0; i < len(pods.Items); i++ {
+		go func() {
+			defer podsWG.Done()
+			var pod *doomedPod
+			select {
+			case pod = <-condemnedPodsChannel:
+				pod.isAlive = false
+				log.Printf("Executing pod '%s'", pod.name)
+				err := job.clientset.Core().Pods(pod.namespace).Delete(pod.name, nil)
+				if err != nil {
+					log.Printf("Unable to delete pod %s because %v", pod.name, err)
+				}
+			default:
+				fmt.Println("No pods were executed")
+			}
+
+			select {
+			case necrology <- pod:
+				log.Printf("Mark pod '%s' as dead ", pod.name)
+			default:
+				fmt.Println("No pods were marked as dead")
+			}
+		}()
 	}
+
+	podsWG.Wait()
 
 	return nil
 }
 
 func (job killerJob) Run() {
 
-	var wg sync.WaitGroup
+	var namespaceWg sync.WaitGroup
 
-	namespaces := getKubernetesNamespaces(job.killerConfig, job.clientset)
-	condemnedPods, err := job.extractDoomedPods(namespaces)
-	if err != nil {
-		log.Fatalf("Failed to get list of condemned pods %v", err)
+	namespaces := job.allowedNamespaces
+	namespaceNumber := len(namespaces)
+	namespaceWg.Add(namespaceNumber)
+
+	for _, namespace := range namespaces {
+		go job.executeDoomedPods(namespace, &namespaceWg)
 	}
 
-	podsNumber := len(condemnedPods)
+	namespaceWg.Wait()
 
-	wg.Add(podsNumber)
-
-	condemnedPodsChannel := make(chan *doomedPod, podsNumber)
-	for _, pod := range condemnedPods {
-		condemnedPodsChannel <- pod
-	}
-
-	necrology := make(chan *doomedPod, podsNumber) // buffered channel because unbeffered wait for read
-
-	for i := 0; i < podsNumber; i++ {
-		go job.executeDoomedPod(condemnedPodsChannel, &necrology, &wg)
-	}
-
-	go func() {
-		for pod := range necrology {
-			// use this for sending events
-			log.Printf("Pod '%s' is alive %t", pod.name, pod.isAlive)
-		}
-	}()
-
-	wg.Wait()
-
-	/* 	clientset := job.clientset
-
-
-	pods, err := clientset.CoreV1().Pods("").List(metav1.ListOptions{})
-	if err != nil {
-		panic(err.Error())
-	}
-	log.Printf("There are %d pods in the cluster\n", len(pods.Items))
-
-	// Examples for error handling:
-	// - Use helper functions like e.g. errors.IsNotFound()
-	// - And/or cast to StatusError and use its properties like e.g. ErrStatus.Message
-	_, err = clientset.CoreV1().Pods("default").Get("nginx", metav1.GetOptions{})
-	if errors.IsNotFound(err) {
-		log.Printf("Pod not found\n")
-	} else if statusError, isStatus := err.(*errors.StatusError); isStatus {
-		log.Printf("Error getting pod %v\n", statusError.ErrStatus.Message)
-	} else if err != nil {
-		panic(err.Error())
-	} else {
-		log.Printf("Found pod\n")
-	} */
 	schedule, _ := cron.Parse(job.cronstring)
 	nextrun := schedule.Next(time.Now())
 	log.Printf("The Moor has done his work, the Moor can go. Next run at: %s", nextrun.String())
@@ -191,37 +180,7 @@ func homeDir() string {
 	return os.Getenv("USERPROFILE") // windows
 }
 
-func listPods() {
-	clientset := clientSet()
-	for {
-		pods, err := clientset.CoreV1().Pods("").List(metav1.ListOptions{})
-		if err != nil {
-			panic(err.Error())
-		}
-		log.Printf("There are %d pods in the cluster\n", len(pods.Items))
-
-		// Examples for error handling:
-		// - Use helper functions like e.g. errors.IsNotFound()
-		// - And/or cast to StatusError and use its properties like e.g. ErrStatus.Message
-		_, err = clientset.CoreV1().Pods("default").Get("nginx", metav1.GetOptions{})
-		if errors.IsNotFound(err) {
-			log.Printf("Pod not found\n")
-		} else if statusError, isStatus := err.(*errors.StatusError); isStatus {
-			log.Printf("Error getting pod %v\n", statusError.ErrStatus.Message)
-		} else if err != nil {
-			panic(err.Error())
-		} else {
-			log.Printf("Found pod\n")
-		}
-
-		time.Sleep(10 * time.Second)
-	}
-}
-
 func killPod(clientset *kubernetes.Clientset, namespace string, pod string, reason string) {
 	log.Printf("Killing pod %s because %s\n", pod, reason)
-	err := clientset.Core().Pods(namespace).Delete(pod, nil)
-	if err != nil {
-		log.Printf("Unable to delete pod %s because %s", pod, err)
-	}
+
 }

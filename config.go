@@ -30,7 +30,6 @@ type schedulerConfig struct {
 
 type runnerConfig struct {
 	Selector              string
-	Match_all             bool
 	Namespace_deny_policy bool
 	Namespace_list        []string
 }
@@ -48,7 +47,6 @@ func initDefault() *killerConfig {
 		},
 		Killer: runnerConfig{
 			Selector:              "destiny in (doomed)",
-			Match_all:             false,
 			Namespace_deny_policy: true,
 			Namespace_list:        []string{"kube-system"},
 		},

@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -42,17 +43,16 @@ func sliceOperation(op string, slice1 []string, slice2 []string) []string {
 
 func getKubernetesListOptions(config *killerConfig) *metav1.ListOptions {
 
-	if !config.Killer.Match_all {
-		if reqs, err := labels.ParseToRequirements(config.Killer.Selector); err != nil {
-			log.Fatalf("Failed to create requirement from reqs %s \n %v", reqs, err)
-		}
-
+	if reqs, err := labels.ParseToRequirements(config.Killer.Selector); err != nil {
+		log.Fatalf("Failed to create requirement from reqs %s \n %v", reqs, err)
 	}
+
+	log.Printf("Used selector: '%s'", config.Killer.Selector)
 
 	return &metav1.ListOptions{LabelSelector: config.Killer.Selector}
 }
 
-func getKubernetesNamespaces(config *runnerConfig, clientset *kubernetes.Clientset) []string {
+func getKubernetesNamespaces(config *killerConfig, clientset *kubernetes.Clientset) []string {
 	namespaces, err := clientset.CoreV1().Namespaces().List(metav1.ListOptions{})
 	var existingNamespaces []string
 	var resultingNamespaces []string
@@ -62,11 +62,14 @@ func getKubernetesNamespaces(config *runnerConfig, clientset *kubernetes.Clients
 	for _, namespace := range namespaces.Items {
 		existingNamespaces = append(existingNamespaces, namespace.Name)
 	}
-	if config.Namespace_deny_policy {
-		resultingNamespaces = sliceOperation("substruction", existingNamespaces, config.Namespace_list)
+	if config.Killer.Namespace_deny_policy {
+		resultingNamespaces = sliceOperation("substruction", existingNamespaces, config.Killer.Namespace_list)
 	} else {
-		resultingNamespaces = sliceOperation("unity", existingNamespaces, config.Namespace_list)
+		resultingNamespaces = sliceOperation("unity", existingNamespaces, config.Killer.Namespace_list)
 	}
+
+	log.Printf("Allowed namespaces for executing pod kills on: [%s]",
+		strings.Join(resultingNamespaces, ", "))
 
 	return resultingNamespaces
 }

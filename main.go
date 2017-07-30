@@ -6,11 +6,14 @@ import (
 )
 
 func Run(config *killerConfig) error {
+	clientset := clientSet()
 	listOptions := getKubernetesListOptions(config)
+	allowedNamespaces := getKubernetesNamespaces(config, clientset)
 	job := &killerJob{
-		clientset:    clientSet(),
-		killerConfig: &config.Killer,
-		listOptions:  listOptions,
+		clientset:         clientset,
+		killerConfig:      &config.Killer,
+		listOptions:       listOptions,
+		allowedNamespaces: allowedNamespaces,
 	}
 	scheduler, err := getJobScheduler(config, job)
 	if err != nil {

@@ -21,11 +21,6 @@ crontime = "0 * * * * *"
 # Only pods with this label will be killed
 # list of rules
 selector = "destiny in (doomed)"
-#If this is true - match_label will be ignored and all pods 
-# with respectin go while/black lists may be killed
-match_all = false
-# If allow - all nodes except blacklist can be killed, ignore whitelist
-# If deny - only pods in whitelist can be killed, ignore blacklist
 namespace_deny_policy = true # default value will be deny
 namespace_list = ["kube-system"]
 # in seconds
