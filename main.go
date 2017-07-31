@@ -3,10 +3,11 @@ package main
 import (
 	"log"
 	"runtime"
+
+	"k8s.io/client-go/kubernetes"
 )
 
-func Run(config *killerConfig) error {
-	clientset := clientSet()
+func run(config *killerConfig, clientset *kubernetes.Clientset) error {
 	listOptions := getKubernetesListOptions(config)
 	allowedNamespaces := getKubernetesNamespaces(config, clientset)
 	job := &killerJob{
@@ -17,7 +18,7 @@ func Run(config *killerConfig) error {
 	}
 	scheduler, err := getJobScheduler(config, job)
 	if err != nil {
-		log.Fatalf("Unable to schedule pod-killer", err)
+		log.Fatalf("Unable to schedule pod-killer %v", err)
 	}
 
 	scheduler.Start()
@@ -25,17 +26,19 @@ func Run(config *killerConfig) error {
 }
 
 func main() {
-	// clientSet := clientSet()
 	log.Printf("Starting pod-killer...")
 
 	config, err := getConfig()
 	if err != nil {
 		panic(err.Error())
 	}
+	clientset := clientSet()
 
 	healthHandler(&config)
 
-	if err := Run(&config); err != nil {
+	watchPods(clientset)
+
+	if err := run(&config, clientset); err != nil {
 		panic(err.Error())
 	}
 
