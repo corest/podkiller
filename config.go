@@ -16,6 +16,7 @@ type killerConfig struct {
 	General   generalConfig
 	Scheduler schedulerConfig
 	Killer    runnerConfig
+	Influx    influxConfig
 }
 
 type generalConfig struct {
@@ -34,6 +35,11 @@ type runnerConfig struct {
 	Namespace_list        []string
 }
 
+type influxConfig struct {
+	Hostname string
+	Port     int
+}
+
 func initDefault() *killerConfig {
 	log.Printf("Load default values...")
 	const layout = "2017-07-27 15:00:46"
@@ -49,6 +55,10 @@ func initDefault() *killerConfig {
 			Selector:              "destiny in (doomed)",
 			Namespace_deny_policy: true,
 			Namespace_list:        []string{"kube-system"},
+		},
+		Influx: influxConfig{
+			Hostname: "localhost",
+			Port:     8086,
 		},
 	}
 	return config

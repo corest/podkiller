@@ -36,47 +36,21 @@ type killerJob struct {
 	clientset         *kubernetes.Clientset
 	killerConfig      *runnerConfig
 	listOptions       *metav1.ListOptions
+	influxmanager     *influxManager
 	allowedNamespaces []string
 	cronstring        string
-}
-
-type namespaceNecrology struct {
-	namespace string
-	pods      []*doomedPod
-}
-
-func (cemetry *namespaceNecrology) layPodLow(pod *doomedPod) error {
-	cemetry.pods = append(cemetry.pods, pod)
-	return nil
+	scheduletAt       time.Time
 }
 
 type doomedPod struct {
-	name      string
-	namespace string
-	isAlive   bool
+	name        string
+	namespace   string
+	isAlive     bool
+	condemnedAt time.Time
 }
 
 func (job *killerJob) setSchedule(crontstring string) {
 	job.cronstring = crontstring
-}
-
-func (job *killerJob) extractDoomedPods(namespaces []string) ([]*doomedPod, error) {
-	var condemnedPods []*doomedPod
-	for _, namespace := range namespaces {
-		pods, err := job.clientset.CoreV1().Pods(namespace).List(*job.listOptions)
-		if err != nil {
-			log.Printf("Failed to get pods from namespace '%s'. %v ", namespace, err)
-		}
-		for _, pod := range pods.Items {
-			dpod := &doomedPod{
-				name:      pod.Name,
-				namespace: namespace,
-				isAlive:   true,
-			}
-			condemnedPods = append(condemnedPods, dpod)
-		}
-	}
-	return condemnedPods, nil
 }
 
 func (job *killerJob) executeDoomedPods(namespace string, wg *sync.WaitGroup) error {
@@ -93,14 +67,14 @@ func (job *killerJob) executeDoomedPods(namespace string, wg *sync.WaitGroup) er
 		condemnedPodsChannel := make(chan *doomedPod, podsNumber)
 		for _, pod := range pods.Items {
 			dpod := &doomedPod{
-				name:      pod.Name,
-				namespace: namespace,
-				isAlive:   true,
+				name:        pod.Name,
+				namespace:   namespace,
+				isAlive:     true,
+				condemnedAt: job.scheduletAt,
 			}
 			condemnedPodsChannel <- dpod
 		}
 
-		necrology := make(chan *doomedPod, podsNumber)
 		var podsWG sync.WaitGroup
 		podsWG.Add(podsNumber)
 		for i := 0; i < len(pods.Items); i++ {
@@ -110,20 +84,15 @@ func (job *killerJob) executeDoomedPods(namespace string, wg *sync.WaitGroup) er
 				select {
 				case pod = <-condemnedPodsChannel:
 					pod.isAlive = false
-					log.Printf("Executing pod '%s'(namespace: '%s')", pod.name, pod.namespace)
+					log.Printf("Killing pod '%s'(namespace: '%s')...", pod.name, pod.namespace)
 					err := job.clientset.Core().Pods(pod.namespace).Delete(pod.name, nil)
 					if err != nil {
 						log.Printf("Unable to delete pod %s(namespace: '%s') because %v", pod.name, pod.namespace, err)
 					}
+					job.influxmanager.addDoomedPod(pod)
+
 				default:
 					fmt.Println("No pods were executed")
-				}
-
-				select {
-				case necrology <- pod:
-					log.Printf("Mark pod '%s'(namespace: '%s') as dead ", pod.name, pod.namespace)
-				default:
-					fmt.Println("No pods were marked as dead")
 				}
 			}()
 		}
@@ -140,6 +109,7 @@ func (job killerJob) Run() {
 
 	var namespaceWg sync.WaitGroup
 
+	job.scheduletAt = time.Now()
 	namespaces := job.allowedNamespaces
 	namespaceNumber := len(namespaces)
 	namespaceWg.Add(namespaceNumber)
@@ -149,6 +119,10 @@ func (job killerJob) Run() {
 	}
 
 	namespaceWg.Wait()
+
+	if err := job.influxmanager.writePodNecrology(); err != nil {
+		log.Fatalf("Failed to write new point into influxdb %v", err)
+	}
 
 	schedule, _ := cron.Parse(job.cronstring)
 	nextrun := schedule.Next(time.Now())

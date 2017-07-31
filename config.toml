@@ -26,6 +26,11 @@ namespace_list = ["kube-system"]
 # in seconds
 retry_interval = 60
 
+[influxdb]
+hostname = "localhost"
+port = 8086
+
+
 
 
 

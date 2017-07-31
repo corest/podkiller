@@ -1,0 +1,28 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: podkiller
+  namespace: kube-system
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: podkiller
+        stack: staging
+    spec:
+      containers:
+      - name: giantswarmdemo
+        image: corest/giantswarmdemo
+        ports:
+        - containerPort: 8080
+      - name: influxdb
+        image: influxdb:1.2
+        ports:
+        - containerPort: 8086
+    livenessProbe:
+        httpGet:
+          path: /health
+          port: 8080
+        initialDelaySeconds: 3
+        periodSeconds: 3
