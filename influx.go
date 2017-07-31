@@ -68,7 +68,7 @@ func (inflx *influxManager) writePodNecrology() error {
 		// Create a new point batch
 		bp, err := client.NewBatchPoints(client.BatchPointsConfig{
 			Database:  podkillerDb,
-			Precision: "s",
+			Precision: "ms",
 		})
 		if err != nil {
 			log.Fatal(err)
@@ -77,13 +77,14 @@ func (inflx *influxManager) writePodNecrology() error {
 		var fields map[string]interface{}
 		tags := map[string]string{"service": podkillerDbTag}
 
-		for _, pod := range inflx.doomedPods {
+		for i, pod := range inflx.doomedPods {
 			fields = map[string]interface{}{
-				"name":          pod.name,
+				"podname":       pod.name,
 				"namespace":     pod.namespace,
 				"condemnded_at": pod.condemnedAt,
 			}
-			pt, err := client.NewPoint(podkillerDbSeries, tags, fields, time.Now())
+			pt, err := client.NewPoint(podkillerDbSeries, tags, fields,
+				time.Now().Add(time.Millisecond*time.Duration(i)))
 			if err != nil {
 				log.Fatal(err)
 			}

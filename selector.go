@@ -23,13 +23,13 @@ func sliceOperation(op string, slice1 []string, slice2 []string) []string {
 
 	switch op {
 	case "substruction":
-		for k, _ := range m1 {
+		for k := range m1 {
 			if _, contains := m2[k]; !contains {
 				diffStr = append(diffStr, k)
 			}
 		}
 	case "unity":
-		for k, _ := range m1 {
+		for k := range m1 {
 			if _, contains := m2[k]; contains {
 				diffStr = append(diffStr, k)
 			}

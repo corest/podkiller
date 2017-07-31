@@ -42,7 +42,7 @@ func main() {
 	influxmanager := influxManager{client: influxcclient}
 	influxmanager.initDB()
 
-	healthHandler(&config)
+	routesHandler(&config, &influxmanager)
 
 	watchPods(clientset)
 
