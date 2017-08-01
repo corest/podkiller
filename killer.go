@@ -1,25 +1,20 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/robfig/cron"
 
-	/*	"k8s.io/client-go/kubernetes"
-		"k8s.io/client-go/rest"*/
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
-/*func clientset() *kubernetes.Clientset {
+func clientSet() *kubernetes.Clientset {
 	log.Printf("Setup kubernetes client")
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -30,7 +25,7 @@ import (
 		panic(err.Error())
 	}
 	return clientset
-}*/
+}
 
 // KillerJob structure
 type KillerJob struct {
@@ -130,35 +125,4 @@ func (job KillerJob) Run() {
 	schedule, _ := cron.Parse(job.cronstring)
 	nextrun := schedule.Next(time.Now())
 	log.Printf("...done. Next run at: %s", nextrun.String())
-}
-
-func clientSet() *kubernetes.Clientset {
-	var kubeconfig *string
-	if home := homeDir(); home != "" {
-		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
-	} else {
-		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-	}
-	flag.Parse()
-
-	// use the current context in kubeconfig
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	// create the clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		panic(err.Error())
-	}
-	return clientset
-
-}
-
-func homeDir() string {
-	if h := os.Getenv("HOME"); h != "" {
-		return h
-	}
-	return os.Getenv("USERPROFILE") // windows
 }
