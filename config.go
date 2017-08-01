@@ -11,52 +11,55 @@ const (
 	cfgpath = "/etc/pod-killer/config.toml"
 )
 
-// Configuration structure
-type killerConfig struct {
-	General   generalConfig
-	Scheduler schedulerConfig
-	Killer    runnerConfig
-	Influx    influxConfig
+// Config structure
+type Config struct {
+	General   GeneralConfig
+	Scheduler SchedulerConfig
+	Killer    KillerConfig
+	Influx    InfluxConfig
 }
 
-type generalConfig struct {
+// GeneralConfig structure
+type GeneralConfig struct {
 	Port int
 }
 
-type schedulerConfig struct {
-	Timezone             string
-	Crontime             string `toml:"crontime"`
-	Random_range_measure string
+// SchedulerConfig structure
+type SchedulerConfig struct {
+	Timezone string
+	Crontime string `toml:"crontime"`
 }
 
-type runnerConfig struct {
-	Selector              string
-	Namespace_deny_policy bool
-	Namespace_list        []string
+// KillerConfig structure
+type KillerConfig struct {
+	Selector            string
+	NamespaceDenyPolicy bool     `toml:"namespace_deny_policy"`
+	NamespaceList       []string `toml:"namespace_list"`
 }
 
-type influxConfig struct {
+// InfluxConfig structure
+type InfluxConfig struct {
 	Hostname string
 	Port     int
 }
 
-func initDefault() *killerConfig {
+func initDefault() *Config {
 	log.Printf("Load default values...")
 	const layout = "2017-07-27 15:00:46"
-	config := &killerConfig{
-		General: generalConfig{
+	config := &Config{
+		General: GeneralConfig{
 			Port: 8081,
 		},
-		Scheduler: schedulerConfig{
+		Scheduler: SchedulerConfig{
 			Timezone: "Europe/Kiev",
 			Crontime: "0 s p * * *",
 		},
-		Killer: runnerConfig{
-			Selector:              "destiny in (doomed)",
-			Namespace_deny_policy: true,
-			Namespace_list:        []string{"kube-system"},
+		Killer: KillerConfig{
+			Selector:            "destiny in (doomed)",
+			NamespaceDenyPolicy: true,
+			NamespaceList:       []string{"kube-system"},
 		},
-		Influx: influxConfig{
+		Influx: InfluxConfig{
 			Hostname: "localhost",
 			Port:     8086,
 		},
@@ -64,7 +67,7 @@ func initDefault() *killerConfig {
 	return config
 }
 
-func getConfig() (killerConfig, error) {
+func getConfig() (Config, error) {
 	log.Printf("Initialize config...")
 
 	config := initDefault()
@@ -75,11 +78,5 @@ func getConfig() (killerConfig, error) {
 
 	log.Printf(fmt.Sprintf("Pod-killer uses config from %s\n", cfgpath))
 
-	//if err := viper.ReadInConfig(); err != nil {
-	//	return err
-	//}
-
-	//ValidateConfigs()
-	//setupWatch()
 	return *config, nil
 }

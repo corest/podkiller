@@ -7,15 +7,15 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func run(config *killerConfig, clientset *kubernetes.Clientset,
-	influxmanager *influxManager) error {
+func run(config *Config, clientset *kubernetes.Clientset,
+	influxmanager *InfluxManager) error {
 
 	listOptions := getKubernetesListOptions(config)
 	allowedNamespaces := getKubernetesNamespaces(config, clientset)
 
-	job := &killerJob{
+	job := &KillerJob{
 		clientset:         clientset,
-		killerConfig:      &config.Killer,
+		config:            &config.Killer,
 		influxmanager:     influxmanager,
 		listOptions:       listOptions,
 		allowedNamespaces: allowedNamespaces,
@@ -39,7 +39,7 @@ func main() {
 	clientset := clientSet()
 
 	influxcclient := getInfluxClient(&config)
-	influxmanager := influxManager{client: influxcclient}
+	influxmanager := InfluxManager{client: influxcclient}
 	influxmanager.initDB()
 
 	routesHandler(&config, &influxmanager)

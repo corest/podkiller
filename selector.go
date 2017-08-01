@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"strings"
 
@@ -9,7 +10,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func sliceOperation(op string, slice1 []string, slice2 []string) []string {
+func sliceOperation(op string, slice1 []string, slice2 []string) ([]string, error) {
 	diffStr := []string{}
 	m1 := map[string]int{}
 	m2 := map[string]int{}
@@ -35,13 +36,13 @@ func sliceOperation(op string, slice1 []string, slice2 []string) []string {
 			}
 		}
 	default:
-		log.Fatalf("Unsupported operation for sliceOperation %s", op)
+		return []string{}, fmt.Errorf("Unsupported operation for sliceOperation %s", op)
 	}
 
-	return diffStr
+	return diffStr, nil
 }
 
-func getKubernetesListOptions(config *killerConfig) *metav1.ListOptions {
+func getKubernetesListOptions(config *Config) *metav1.ListOptions {
 
 	if reqs, err := labels.ParseToRequirements(config.Killer.Selector); err != nil {
 		log.Fatalf("Failed to create requirement from reqs %s \n %v", reqs, err)
@@ -52,7 +53,7 @@ func getKubernetesListOptions(config *killerConfig) *metav1.ListOptions {
 	return &metav1.ListOptions{LabelSelector: config.Killer.Selector}
 }
 
-func getKubernetesNamespaces(config *killerConfig, clientset *kubernetes.Clientset) []string {
+func getKubernetesNamespaces(config *Config, clientset *kubernetes.Clientset) []string {
 	namespaces, err := clientset.CoreV1().Namespaces().List(metav1.ListOptions{})
 	var existingNamespaces []string
 	var resultingNamespaces []string
@@ -62,10 +63,16 @@ func getKubernetesNamespaces(config *killerConfig, clientset *kubernetes.Clients
 	for _, namespace := range namespaces.Items {
 		existingNamespaces = append(existingNamespaces, namespace.Name)
 	}
-	if config.Killer.Namespace_deny_policy {
-		resultingNamespaces = sliceOperation("substruction", existingNamespaces, config.Killer.Namespace_list)
+	if config.Killer.NamespaceDenyPolicy {
+		resultingNamespaces, err = sliceOperation("substruction", existingNamespaces, config.Killer.NamespaceList)
+		if err != nil {
+			log.Fatalf(err.Error())
+		}
 	} else {
-		resultingNamespaces = sliceOperation("unity", existingNamespaces, config.Killer.Namespace_list)
+		resultingNamespaces, err = sliceOperation("unity", existingNamespaces, config.Killer.NamespaceList)
+		if err != nil {
+			log.Fatalf(err.Error())
+		}
 	}
 
 	log.Printf("Allowed namespaces for executing pod kills on: [%s]",

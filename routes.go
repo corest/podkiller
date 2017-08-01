@@ -8,8 +8,9 @@ import (
 	"strconv"
 )
 
-type router struct {
-	influxmanager *influxManager
+// Router structure
+type Router struct {
+	influxmanager *InfluxManager
 }
 
 func writeJSONResponse(w http.ResponseWriter, status int, data []byte) {
@@ -19,7 +20,7 @@ func writeJSONResponse(w http.ResponseWriter, status int, data []byte) {
 	w.Write(data)
 }
 
-func (rtr *router) health(w http.ResponseWriter, r *http.Request) {
+func (rtr *Router) health(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Check /health endpoint by %s\n", r.RemoteAddr)
 	data, _ := json.Marshal(healthCheckResponse{Status: "Pod killer is up and running"})
 	writeJSONResponse(w, http.StatusOK, data)
@@ -33,7 +34,7 @@ type errorResponse struct {
 	Error string `json:"error"`
 }
 
-func (rtr *router) metrics(w http.ResponseWriter, r *http.Request) {
+func (rtr *Router) metrics(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Get /metrics endpoint by %s\n", r.RemoteAddr)
 	responseCode := http.StatusOK
 	var responseData []byte
@@ -69,9 +70,9 @@ type metricsResponse struct {
 	Values  [][]interface{} `json:"values"`
 }
 
-func routesHandler(config *killerConfig, influxmanager *influxManager) {
+func routesHandler(config *Config, influxmanager *InfluxManager) {
 	h := http.NewServeMux()
-	r := &router{influxmanager: influxmanager}
+	r := &Router{influxmanager: influxmanager}
 	h.HandleFunc("/health", r.health)
 	h.HandleFunc("/metrics", r.metrics)
 	go http.ListenAndServe(fmt.Sprintf(":%s", strconv.Itoa(config.General.Port)), h)

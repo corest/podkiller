@@ -14,12 +14,13 @@ const (
 	podkillerDbSeries = "doomedpod"
 )
 
-type influxManager struct {
+// InfluxManager influxdb manager
+type InfluxManager struct {
 	client     client.Client
-	doomedPods []*doomedPod
+	doomedPods []*DoomedPod
 }
 
-func getInfluxClient(config *killerConfig) client.Client {
+func getInfluxClient(config *Config) client.Client {
 	var clnt client.Client
 
 	clnt, err := client.NewHTTPClient(client.HTTPConfig{
@@ -32,7 +33,7 @@ func getInfluxClient(config *killerConfig) client.Client {
 	return clnt
 }
 
-func (inflx *influxManager) initDB() {
+func (inflx *InfluxManager) initDB() {
 	q := fmt.Sprintf("CREATE DATABASE %s", podkillerDb)
 	_, err := inflx.queryDB(q)
 	if err != nil {
@@ -41,7 +42,7 @@ func (inflx *influxManager) initDB() {
 }
 
 // queryDB convenience function to query the database
-func (inflx *influxManager) queryDB(cmd string) (res []client.Result, err error) {
+func (inflx *InfluxManager) queryDB(cmd string) (res []client.Result, err error) {
 	q := client.Query{
 		Command:  cmd,
 		Database: podkillerDb,
@@ -58,11 +59,11 @@ func (inflx *influxManager) queryDB(cmd string) (res []client.Result, err error)
 	return res, nil
 }
 
-func (inflx *influxManager) addDoomedPod(pod *doomedPod) {
+func (inflx *InfluxManager) addDoomedPod(pod *DoomedPod) {
 	inflx.doomedPods = append(inflx.doomedPods, pod)
 }
 
-func (inflx *influxManager) writePodNecrology() error {
+func (inflx *InfluxManager) writePodNecrology() error {
 
 	if len(inflx.doomedPods) > 0 {
 		// Create a new point batch

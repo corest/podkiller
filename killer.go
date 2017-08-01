@@ -32,28 +32,30 @@ import (
 	return clientset
 }*/
 
-type killerJob struct {
+// KillerJob structure
+type KillerJob struct {
 	clientset         *kubernetes.Clientset
-	killerConfig      *runnerConfig
+	config            *KillerConfig
 	listOptions       *metav1.ListOptions
-	influxmanager     *influxManager
+	influxmanager     *InfluxManager
 	allowedNamespaces []string
 	cronstring        string
 	scheduletAt       time.Time
 }
 
-type doomedPod struct {
+// DoomedPod structure
+type DoomedPod struct {
 	name        string
 	namespace   string
 	isAlive     bool
 	condemnedAt time.Time
 }
 
-func (job *killerJob) setSchedule(crontstring string) {
+func (job *KillerJob) setSchedule(crontstring string) {
 	job.cronstring = crontstring
 }
 
-func (job *killerJob) executeDoomedPods(namespace string, wg *sync.WaitGroup) error {
+func (job *KillerJob) executeDoomedPods(namespace string, wg *sync.WaitGroup) error {
 	defer wg.Done()
 	pods, err := job.clientset.CoreV1().Pods(namespace).List(*job.listOptions)
 	if err != nil {
@@ -64,9 +66,9 @@ func (job *killerJob) executeDoomedPods(namespace string, wg *sync.WaitGroup) er
 		podsNumber := len(pods.Items)
 		log.Printf("Found %d pods to kill in namespace '%s'.", podsNumber, namespace)
 
-		condemnedPodsChannel := make(chan *doomedPod, podsNumber)
+		condemnedPodsChannel := make(chan *DoomedPod, podsNumber)
 		for _, pod := range pods.Items {
-			dpod := &doomedPod{
+			dpod := &DoomedPod{
 				name:        pod.Name,
 				namespace:   namespace,
 				isAlive:     true,
@@ -80,7 +82,7 @@ func (job *killerJob) executeDoomedPods(namespace string, wg *sync.WaitGroup) er
 		for i := 0; i < len(pods.Items); i++ {
 			go func() {
 				defer podsWG.Done()
-				var pod *doomedPod
+				var pod *DoomedPod
 				select {
 				case pod = <-condemnedPodsChannel:
 					pod.isAlive = false
@@ -103,7 +105,8 @@ func (job *killerJob) executeDoomedPods(namespace string, wg *sync.WaitGroup) er
 	return nil
 }
 
-func (job killerJob) Run() {
+// Run - main function for running scheduled jobs
+func (job KillerJob) Run() {
 
 	log.Println("Running new killer job...")
 

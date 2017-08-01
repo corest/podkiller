@@ -35,7 +35,7 @@ func parseCronOption(c string, min, max int) string {
 	return res
 }
 
-func getCronTime(config *killerConfig) string {
+func getCronTime(config *Config) string {
 
 	cronTemplate := config.Scheduler.Crontime
 	var buffer bytes.Buffer
@@ -56,7 +56,7 @@ func getCronTime(config *killerConfig) string {
 	return crontime
 }
 
-func getJobScheduler(config *killerConfig, cmd *killerJob) (*cron.Cron, error) {
+func getJobScheduler(config *Config, cmd *KillerJob) (*cron.Cron, error) {
 
 	var cronjob *cron.Cron
 	timezone := config.Scheduler.Timezone
