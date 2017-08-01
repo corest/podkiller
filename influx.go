@@ -35,10 +35,15 @@ func getInfluxClient(config *Config) client.Client {
 
 func (inflx *InfluxManager) initDB() {
 	q := fmt.Sprintf("CREATE DATABASE %s", podkillerDb)
-	_, err := inflx.queryDB(q)
+
+	err := retry(5, 2*time.Second, func() (err error) {
+		_, err = inflx.queryDB(q)
+		return
+	})
 	if err != nil {
 		log.Fatalf("Failed to initialize database %s %v", podkillerDb, err)
 	}
+
 }
 
 // queryDB convenience function to query the database
