@@ -1,3 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: podkiller-svc
+  labels:
+    app: podkiller-svc
+  namespace: kube-system
+spec:
+  type: NodePort
+  ports:
+  - port: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: podkiller
+---
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
@@ -12,17 +28,18 @@ spec:
         stack: staging
     spec:
       containers:
-      - name: giantswarmdemo
-        image: corest/giantswarmdemo
+      - name: podkiller
+        image: corest/podkiller
         ports:
         - containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          timeoutSeconds: 2
+          periodSeconds: 15
       - name: influxdb
         image: influxdb:1.2
         ports:
         - containerPort: 8086
-    livenessProbe:
-        httpGet:
-          path: /health
-          port: 8080
-        initialDelaySeconds: 3
-        periodSeconds: 3
